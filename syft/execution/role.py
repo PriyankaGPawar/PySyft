@@ -29,17 +29,19 @@ class Role:
     def __init__(
         self,
         state: State = None,
-        actions: List[Action] = None,
+        actions: Dict[str, List[Action]] = None,
         placeholders: Dict[Union[str, int], PlaceHolder] = None,
         input_placeholder_ids: Tuple[int, str] = None,
         output_placeholder_ids: Tuple[int, str] = None,
+        base_framework: str = TranslationTarget.PYTORCH.value,
         # General kwargs
         id: Union[str, int] = None,
         operations: Dict[str, List[Action]] = None,
     ):
         self.id = id or sy.ID_PROVIDER.pop()
 
-        self.actions = actions or []
+        self.base_framework = base_framework
+        self.actions = actions or {base_framework: []}
 
         # All placeholders
         self.placeholders = placeholders or {}
@@ -50,6 +52,14 @@ class Role:
 
         self.state = state or State()
         self.operations = operations or {}
+
+    @property
+    def default_actions(self):
+        return self.actions.get(self.base_framework, [])
+
+    @default_actions.setter
+    def default_actions(self, val):
+        self.actions[self.base_framework] = val
 
     def input_placeholders(self):
         return [self.placeholders[id_] for id_ in self.input_placeholder_ids]
@@ -86,7 +96,7 @@ class Role:
                 return_placeholder_ids = (return_placeholder_ids,)
 
         action = action_type(*command_placeholder_ids, return_ids=return_placeholder_ids)
-        self.actions.append(action)
+        self.actions[self.base_framework].append(action)
 
     def register_state_tensor(self, tensor, owner):
         placeholder = sy.PlaceHolder(id=tensor.id, role=self, owner=owner)
@@ -99,7 +109,7 @@ class Role:
         """ Make the role execute all its actions using args_ as inputs.
         """
         self._instantiate_inputs(args_)
-        for action in self.actions:
+        for action in self.default_actions:
             self._execute_action(action)
 
         output_placeholders = tuple(
@@ -226,14 +236,20 @@ class Role:
             else:
                 return obj
 
-        new_actions = []
-        for action in self.actions:
-            action_type = type(action)
-            target = _replace_placeholder_ids(action.target)
-            args_ = _replace_placeholder_ids(action.args)
-            kwargs_ = _replace_placeholder_ids(action.kwargs)
-            return_ids = _replace_placeholder_ids(action.return_ids)
-            new_actions.append(action_type(action.name, target, args_, kwargs_, return_ids))
+        def copy_actions(actions, framework):
+            new_actions = []
+            for action in actions:
+                action_type = type(action)
+                target = _replace_placeholder_ids(action.target)
+                args_ = _replace_placeholder_ids(action.args)
+                kwargs_ = _replace_placeholder_ids(action.kwargs)
+                return_ids = _replace_placeholder_ids(action.return_ids)
+                new_actions.append(action_type(action.name, target, args_, kwargs_, return_ids))
+            return new_actions
+
+        new_actions = {}
+        for framework, actions in self.actions.items():
+            new_actions[framework] = copy_actions(actions, framework)
 
         return Role(
             state=state,
@@ -261,6 +277,7 @@ class Role:
             sy.serde.msgpack.serde._simplify(worker, role.placeholders),
             role.input_placeholder_ids,
             role.output_placeholder_ids,
+            role.base_framework,
         )
 
     @staticmethod
@@ -280,6 +297,7 @@ class Role:
             placeholders,
             input_placeholder_ids,
             output_placeholder_ids,
+            base_framework,
         ) = role_tuple
 
         id_ = sy.serde.msgpack.serde._detail(worker, id_)
@@ -299,6 +317,7 @@ class Role:
             actions=actions,
             input_placeholder_ids=input_placeholder_ids,
             output_placeholder_ids=output_placeholder_ids,
+            base_framework=base_framework,
         )
         for ph in placeholders.values():
             ph.role = role

@@ -123,7 +123,7 @@ class Plan(AbstractObject):
         # Plan instance info
         self.name = name or self.__class__.__name__
 
-        self.role = role or Role()
+        self.role = role or Role(base_framework=base_framework)
 
         if role is None:
             for st in state_tensors:
@@ -135,7 +135,6 @@ class Plan(AbstractObject):
         self.is_built = is_built
         self.torchscript = None
         self.tracing = False
-        self.base_framework = base_framework
 
         # The plan has not been sent so it has no reference to remote locations
         self.pointers = dict()
@@ -149,8 +148,16 @@ class Plan(AbstractObject):
         self.translations = []
 
     @property
+    def base_framework(self):
+        return self.role.base_framework
+
+    @property
     def state(self):
         return self.role.state
+
+    @property
+    def default_actions(self):
+        return self.role.default_actions
 
     @property
     def actions(self):

@@ -23,7 +23,7 @@ def test_stateful_plan_built_automatically(hook):
         return x + bias
 
     assert isinstance(foo.__str__(), str)
-    assert len(foo.actions) > 0
+    assert len(foo.default_actions) > 0
     assert foo.is_built
 
     t = th.tensor([1.0, 2])

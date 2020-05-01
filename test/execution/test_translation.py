@@ -26,7 +26,7 @@ def test_plan_can_be_jit_traced(hook, workers):
         return x + bias
 
     assert isinstance(foo.__str__(), str)
-    assert len(foo.actions) > 0
+    assert len(foo.role.default_actions) > 0
     assert foo.is_built
 
     t = th.tensor([1.0, 2])
@@ -44,6 +44,7 @@ def test_plan_can_be_jit_traced(hook, workers):
 
 def test_func_plan_can_be_translated_to_tfjs(hook, workers):
     Plan._build_translators = []
+
     @sy.func2plan(args_shape=[(3, 3)])
     def plan(x):
         x = x * 2
@@ -53,24 +54,26 @@ def test_func_plan_can_be_translated_to_tfjs(hook, workers):
     orig_plan = plan.copy()
 
     plan_js = plan.add_translation(PlanTranslatorTfjs)
-    assert plan_js.role.actions[0].name == 'tf.mul'
-    assert len(plan_js.role.actions[0].args) == 2
+    assert plan_js.role.default_actions[0].name == "tf.mul"
+    assert len(plan_js.role.default_actions[0].args) == 2
 
     # check that translation can be done after serde
     serde_plan = deserialize(serialize(orig_plan))
     serde_plan = serde_plan.add_translation(PlanTranslatorTfjs)
-    assert serde_plan.role.actions[0].name == 'tf.mul'
-    assert len(serde_plan.role.actions[0].args) == 2
+    assert serde_plan.role.default_actions[0].name == "tf.mul"
+    assert len(serde_plan.role.default_actions[0].args) == 2
 
     # check that translation is not lost after serde
     serde_plan_full = deserialize(serialize(plan_js))
-    assert serde_plan_full.role.actions[0].name == 'tf.mul'
-    assert len(serde_plan_full.role.actions[0].args) == 2
+
+    assert serde_plan_full.role.default_actions[0].name == "tf.mul"
+    assert len(serde_plan_full.role.default_actions[0].args) == 2
 
 
 @pytest.mark.skip(reason="Missing translation for torch.nn.functional.linear")
 def test_cls_plan_can_be_translated_to_tfjs(hook, workers):
     Plan._build_translators = []
+
     class Net(sy.Plan):
         def __init__(self):
             super(Net, self).__init__()
@@ -173,19 +176,19 @@ def test_plan_translation_remove(hook, workers):
     assert full_plan.torchscript is not None
 
     assert plan.torchscript is not None
-    assert len(plan.role.actions) > 0
+    assert len(plan.role.default_actions) > 0
 
     plan.remove_translation()
     assert plan.torchscript is not None
-    assert len(plan.role.actions) == 0
+    assert len(plan.role.default_actions) == 0
 
     plan.remove_translation(PlanTranslatorTorchscript)
     assert plan.torchscript is None
-    assert len(plan.role.actions) == 0
+    assert len(plan.role.default_actions) == 0
 
     full_plan.remove_translation(PlanTranslatorTorchscript)
     assert full_plan.torchscript is None
-    assert len(full_plan.role.actions) > 0
+    assert len(full_plan.role.default_actions) > 0
 
 
 def test_plan_translated_on_build(hook, workers):

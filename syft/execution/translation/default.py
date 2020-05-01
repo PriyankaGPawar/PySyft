@@ -13,6 +13,6 @@ class PlanTranslatorDefault(AbstractPlanTranslator):
 
     def remove(self):
         plan = self.plan
-        plan.role.actions = []
+        plan.role.actions = {}
 
         return plan

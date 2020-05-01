@@ -9,4 +9,4 @@ def test_plan_module_tracing():
         return x + y
 
     p = plan_test(torch.tensor([3]))
-    assert len(plan_test.role.actions) == 2
+    assert len(plan_test.role.default_actions) == 2
